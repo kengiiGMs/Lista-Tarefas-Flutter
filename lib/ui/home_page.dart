@@ -137,6 +137,34 @@ class _HomePageState extends State<HomePage> {
                       toDoList: _toDoList,
                       setStateCallback: setState,
                       saveDataCallback: _saveData,
+                      onRemove: (item, index) {
+                        setState(() {
+                          _lastRemoved = Map.from(item);
+                          _lastRemovedPos = index;
+                          _toDoList.removeAt(index);
+                          _saveData();
+
+                          final snack = SnackBar(
+                            content: Text(
+                              "Tarefa ${_lastRemoved?["title"]} removida!",
+                            ),
+                            action: SnackBarAction(
+                              label: "Desfazer",
+                              onPressed: () {
+                                setState(() {
+                                  _toDoList.insert(
+                                    _lastRemovedPos!,
+                                    _lastRemoved,
+                                  );
+                                  _saveData();
+                                });
+                              },
+                            ),
+                            duration: Duration(seconds: 2),
+                          );
+                          ScaffoldMessenger.of(context).showSnackBar(snack);
+                        });
+                      },
                     ),
               ),
             ),
