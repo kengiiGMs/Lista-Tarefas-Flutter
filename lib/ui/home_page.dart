@@ -1,7 +1,91 @@
-import 'package:flutter/material.dart';
+import 'dart:io';
+import 'dart:convert';
+import 'dart:async';
 
-class HomePage extends StatelessWidget {
+import 'package:flutter/material.dart';
+import 'package:lista_tarefas/components/item_list_custom.dart';
+import 'package:path_provider/path_provider.dart';
+
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  List _toDoList = [];
+  final _toDoController = TextEditingController();
+
+  Map<String, dynamic>? _lastRemoved;
+  int? _lastRemovedPos;
+
+  /* Retorna os dados do arquivo ao iniciar o app */
+  @override
+  void initState() {
+    super.initState();
+    _readData().then((data) {
+      setState(() {
+        _toDoList = jsonDecode(data);
+      });
+    });
+  }
+
+  /* Retorna arquivo que será salvo os dados  */
+  Future<File> _getFile() async {
+    final directory = await getApplicationDocumentsDirectory();
+    return File("${directory.path}/data.json");
+  }
+
+  /* Retorna os dados do arquivo */
+  Future<String> _readData() async {
+    try {
+      final file = await _getFile();
+      return file.readAsString();
+    } catch (e) {
+      return "Erro + $e";
+    }
+  }
+
+  /* Salvar dados (substituição) no arquivo */
+  Future<File> _saveData() async {
+    String data = jsonEncode(_toDoList);
+    final file = await _getFile();
+    return file.writeAsString(data);
+  }
+
+  /* Adiciona dados na lista */
+  void _addToDo() {
+    setState(() {
+      Map<String, dynamic> newToDo = {};
+      newToDo["title"] = _toDoController.text;
+      _toDoController.text = "";
+      newToDo["ok"] = false;
+      _toDoList.add(newToDo);
+      _saveData();
+    });
+  }
+
+  /* Atualizar Lista e ordernar de acordo com o status */
+  Future<Null> _refresh() async {
+    await Future.delayed(Duration(seconds: 1));
+
+    setState(() {
+      _toDoList.sort((a, b) {
+        if (a["ok"] && !b["ok"]) {
+          return 1;
+        } else if (!a["ok"] && b["ok"]) {
+          return -1;
+        } else {
+          return 0;
+        }
+      });
+
+      _saveData();
+    });
+
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -19,6 +103,7 @@ class HomePage extends StatelessWidget {
               children: [
                 Expanded(
                   child: TextField(
+                    controller: _toDoController,
                     decoration: InputDecoration(
                       labelText: "Nova Tarefa",
                       labelStyle: TextStyle(color: Colors.blueAccent),
@@ -32,25 +117,28 @@ class HomePage extends StatelessWidget {
                   ),
                 ),
                 FloatingActionButton(
-                  onPressed: () {},
-                  child: Icon(Icons.add, color: Colors.white),
+                  onPressed: _addToDo,
                   backgroundColor: Colors.blueAccent,
+                  child: Icon(Icons.add, color: Colors.white),
                 ),
               ],
             ),
           ),
           Expanded(
-            child: ListView(
-              children: [
-                CheckboxListTile(
-                  title: Text("A"),
-                  value: false,
-                  onChanged: (check) => {},
-                  secondary: CircleAvatar(
-                    child: Icon(Icons.error, color: Colors.red),
-                  ),
-                ),
-              ],
+            child: RefreshIndicator(
+              onRefresh: _refresh,
+              child: ListView.builder(
+                padding: EdgeInsets.only(top: 10.0),
+                itemCount: _toDoList.length,
+                itemBuilder:
+                    (context, index) => buildItem(
+                      context: context,
+                      index: index,
+                      toDoList: _toDoList,
+                      setStateCallback: setState,
+                      saveDataCallback: _saveData,
+                    ),
+              ),
             ),
           ),
         ],
